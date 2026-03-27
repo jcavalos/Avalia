@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (API keys)
+.env
+
+# Datos locales
+data/
+exported_chats/
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
