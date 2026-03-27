@@ -2,7 +2,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const path = require('path');
 
 module.exports = {
-  CLAUDE_API_KEY: process.env.CLAUDE_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   MODE: process.env.BOT_MODE || 'suggest',
   MIN_REPLY_INTERVAL: parseInt(process.env.MIN_REPLY_INTERVAL) || 5,
   ALLOWED_CONTACTS: process.env.ALLOWED_CONTACTS

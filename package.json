@@ -1,16 +1,11 @@
 {
-  "name": "whatsapp-bot",
+  "name": "bot-whatsapp",
   "version": "1.0.0",
-  "description": "Bot personal de WhatsApp con IA",
   "main": "src/bot.js",
   "scripts": {
     "start": "node src/bot.js",
-    "analyze": "node -e \"const StyleAnalyzer = require('./src/analyzer'); const a = new StyleAnalyzer(); a.analyzeExportedChats();\"",
-    "clear-auth": "rm -rf .wwebjs_auth .wwebjs_cache"
+    "analyze": "node src/analyze-only.js"
   },
-  "keywords": ["whatsapp", "bot", "ai"],
-  "author": "Tu Nombre",
-  "license": "MIT",
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
     "qrcode-terminal": "^0.12.0",
@@ -18,33 +13,3 @@
     "dotenv": "^16.3.1"
   }
 }
-```
-
----
-
-### **FASE 5: EXPORTAR CHATS DE WHATSAPP (10 min)**
-
-#### 5.1 En tu teléfono:
-
-1. Abre WhatsApp
-2. Selecciona un chat importante (amigo, familia, pareja)
-3. Toca los **3 puntos** (arriba derecha)
-4. **Más** → **Exportar chat**
-5. Selecciona **"Sin archivos multimedia"**
-6. Envíatelo por email o súbelo a Drive
-
-#### 5.2 Guarda los archivos:
-
-Repite esto con **5-10 conversaciones diferentes** y guarda todos los archivos `.txt` en la carpeta `exported_chats/`
-
----
-
-### **FASE 6: CONFIGURAR Y EJECUTAR (10 min)**
-
-#### 6.1 Editar .env
-
-Abre `.env` y pon tu API key de Claude:
-```
-CLAUDE_API_KEY=sk-ant-api03-tu-key-real-aqui
-BOT_MODE=suggest
-MIN_REPLY_INTERVAL=5

@@ -3,9 +3,9 @@ const fs     = require('fs');
 const path   = require('path');
 const config = require('./config');
 
-class ClaudeClient {
+class GeminiClient {
   constructor() {
-    this.apiKey = config.CLAUDE_API_KEY;
+    this.apiKey = config.GEMINI_API_KEY;
     this.conversationHistory = new Map();
     this._loadConversations();
   }
@@ -17,42 +17,36 @@ class ClaudeClient {
       }
 
       const history = this.conversationHistory.get(sender);
-      history.push({ role: 'user', content: message });
+      history.push({ role: 'user', parts: [{ text: message }] });
 
       const recentHistory = history.slice(-20);
 
       const response = await axios.post(
-        'https://api.anthropic.com/v1/messages',
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`,
         {
-          model:       'claude-haiku-4-5-20251001',  // más económico
-          max_tokens:  300,
-          temperature: 0.8,
-          system:      systemPrompt,
-          messages:    recentHistory
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: recentHistory,
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 300
+          }
         },
         {
-          headers: {
-            'Content-Type':      'application/json',
-            'x-api-key':         this.apiKey,
-            'anthropic-version': '2023-06-01'
-          },
+          headers: { 'Content-Type': 'application/json' },
           timeout: 30000
         }
       );
 
-      const reply = response.data.content[0].text.trim();
+      const reply = response.data.candidates[0].content.parts[0].text.trim();
 
-      history.push({ role: 'assistant', content: reply });
+      history.push({ role: 'model', parts: [{ text: reply }] });
       this._saveConversations();
 
       return reply;
 
     } catch (error) {
       if (error.response) {
-        const { status, data } = error.response;
-        if (status === 401) console.error('❌ API Key inválida. Revisa tu .env');
-        else if (status === 429) console.error('⏱️  Rate limit. Espera un momento.');
-        else console.error(`❌ Error ${status}:`, data?.error?.message || 'desconocido');
+        console.error(`❌ Error ${error.response.status}:`, error.response.data?.error?.message || 'desconocido');
       } else {
         console.error('❌ Sin conexión o timeout:', error.message);
       }
@@ -81,17 +75,17 @@ class ClaudeClient {
       JSON.stringify(Object.fromEntries(this.conversationHistory), null, 2)
     );
   }
-
-  clearHistory(sender = null) {
-    if (sender) {
-      this.conversationHistory.delete(sender);
-      console.log(`✅ Historial borrado para: ${sender}`);
-    } else {
-      this.conversationHistory.clear();
-      console.log('✅ Todo el historial borrado');
-    }
-    this._saveConversations();
-  }
 }
 
-module.exports = ClaudeClient;
+module.exports = GeminiClient;
+```
+
+---
+
+**Luego actualiza tu `.env`** — cambia `CLAUDE_API_KEY` por esto:
+```
+GEMINI_API_KEY=pega-tu-key-de-gemini-aqui
+BOT_MODE=suggest
+MIN_REPLY_INTERVAL=5
+ALLOWED_CONTACTS=
+AUTO_REPLY_KEYWORDS=

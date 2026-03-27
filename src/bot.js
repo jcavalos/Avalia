@@ -142,7 +142,7 @@ class WhatsAppBot {
     console.log('🎯 WHATSAPP BOT PERSONAL');
     console.log('='.repeat(50) + '\n');
 
-    if (!config.CLAUDE_API_KEY || config.CLAUDE_API_KEY === 'tu-api-key-aqui') {
+    if (!config.GEMINI_API_KEY || config.GEMINI_API_KEY === 'pega-tu-key-de-gemini-aqui') {
       console.error('❌ Falta CLAUDE_API_KEY en tu archivo .env\n');
       console.log('   1. Ve a https://console.anthropic.com/');
       console.log('   2. Crea una API key');
