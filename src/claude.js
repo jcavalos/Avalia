@@ -3,9 +3,9 @@ const fs     = require('fs');
 const path   = require('path');
 const config = require('./config');
 
-class GeminiClient {
+class GroqClient {
   constructor() {
-    this.apiKey = config.GEMINI_API_KEY;
+    this.apiKey = config.GROQ_API_KEY;
     this.conversationHistory = new Map();
     this._loadConversations();
   }
@@ -15,33 +15,33 @@ class GeminiClient {
       if (!this.conversationHistory.has(sender)) {
         this.conversationHistory.set(sender, []);
       }
-
       const history = this.conversationHistory.get(sender);
-      history.push({ role: 'user', parts: [{ text: message }] });
-
+      history.push({ role: 'user', content: message });
       const recentHistory = history.slice(-20);
 
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiKey}`,
+        'https://api.groq.com/openai/v1/chat/completions',
         {
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: recentHistory,
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: 300
-          }
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 300,
+          temperature: 0.8,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...recentHistory
+          ]
         },
         {
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          },
           timeout: 30000
         }
       );
 
-      const reply = response.data.candidates[0].content.parts[0].text.trim();
-
-      history.push({ role: 'model', parts: [{ text: reply }] });
+      const reply = response.data.choices[0].message.content.trim();
+      history.push({ role: 'assistant', content: reply });
       this._saveConversations();
-
       return reply;
 
     } catch (error) {
@@ -57,7 +57,6 @@ class GeminiClient {
   _loadConversations() {
     const dir = path.dirname(config.PATHS.CONVERSATIONS);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
     if (fs.existsSync(config.PATHS.CONVERSATIONS)) {
       try {
         const data = JSON.parse(fs.readFileSync(config.PATHS.CONVERSATIONS, 'utf-8'));
@@ -77,15 +76,4 @@ class GeminiClient {
   }
 }
 
-module.exports = GeminiClient;
-```
-
----
-
-**Luego actualiza tu `.env`** — cambia `CLAUDE_API_KEY` por esto:
-```
-GEMINI_API_KEY=pega-tu-key-de-gemini-aqui
-BOT_MODE=suggest
-MIN_REPLY_INTERVAL=5
-ALLOWED_CONTACTS=
-AUTO_REPLY_KEYWORDS=
+module.exports = GroqClient;

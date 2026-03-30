@@ -23,44 +23,49 @@ class StyleAnalyzer {
       throw new Error(`📁 No hay archivos .txt en: ${chatsPath}\n   Exporta al menos 5 conversaciones de WhatsApp.`);
     }
 
-    let myMessages = [];
     const nameCounts = {};
+
+    // Formato México con corchetes: [22/09/25, 11:43:38 a.m.] Nombre: mensaje
+    const lineRegex = /^\[[\d\/]+,\s[\d:]+\s[ap]\.m\.\]\s([^:]+):\s(.+)$/i;
 
     files.forEach(file => {
       console.log(`   📄 Leyendo: ${file}`);
       const content = fs.readFileSync(path.join(chatsPath, file), 'utf-8');
-      const lines   = content.split('\n');
-
-      lines.forEach(line => {
-        const match = line.match(
-          /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})[,\s]+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]\.?m\.?)?)\s*[-–]\s*([^:]+?):\s*(.+)/i
-        );
+      content.split('\n').forEach(line => {
+        const clean = line.trim();
+        const match = clean.match(lineRegex);
         if (match) {
-          const name = match[3].trim();
+          const name = match[1].trim();
           nameCounts[name] = (nameCounts[name] || 0) + 1;
         }
       });
     });
 
-    // El nombre con más mensajes es el tuyo
-    const yourName = Object.entries(nameCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
-
-    if (!yourName) {
+    if (Object.keys(nameCounts).length === 0) {
       throw new Error('No se pudo detectar ningún nombre en los chats. Revisa el formato de los archivos .txt.');
     }
 
-    console.log(`\n👤 Nombre detectado: ${yourName}\n`);
+    // El nombre con más mensajes es el tuyo
+    const yourName = Object.entries(nameCounts).sort((a, b) => b[1] - a[1])[0][0];
+
+    console.log(`\n👤 Nombre detectado como tuyo: "${yourName}"`);
+    console.log(`   (el que más mensajes tiene en todos los chats)\n`);
+
+    const myMessages = [];
+    const skipPhrases = [
+      'imagen omitida', 'video omitido', 'audio omitido',
+      'archivo omitido', 'sticker omitido', 'llamada perdida',
+      'cifrados de extremo a extremo', 'Los mensajes y las llamadas'
+    ];
 
     files.forEach(file => {
       const content = fs.readFileSync(path.join(chatsPath, file), 'utf-8');
       content.split('\n').forEach(line => {
-        const match = line.match(
-          /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})[,\s]+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]\.?m\.?)?)\s*[-–]\s*([^:]+?):\s*(.+)/i
-        );
-        if (match && match[3].trim() === yourName) {
-          const msg = match[4].trim();
-          if (!['imagen omitida','video omitido','audio omitido','archivo omitido','sticker omitido']
-              .some(s => msg.includes(s))) {
+        const clean = line.trim();
+        const match = clean.match(lineRegex);
+        if (match && match[1].trim() === yourName) {
+          const msg = match[2].trim();
+          if (!skipPhrases.some(s => msg.includes(s))) {
             myMessages.push(msg);
           }
         }
@@ -74,7 +79,7 @@ class StyleAnalyzer {
       );
     }
 
-    console.log(`✅ ${myMessages.length} mensajes encontrados de: ${yourName}\n`);
+    console.log(`✅ ${myMessages.length} mensajes tuyos encontrados\n`);
 
     this.myStyle = this._analyzeStyle(myMessages);
     this._saveStyle();
@@ -97,7 +102,10 @@ class StyleAnalyzer {
 
     const phraseCounts = {};
     messages.forEach(msg => {
-      const words = msg.toLowerCase().replace(/[^\wáéíóúñü\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+      const words = msg.toLowerCase()
+        .replace(/[^\wáéíóúñü\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 2);
       for (let i = 0; i < words.length - 1; i++) {
         const p2 = words.slice(i, i + 2).join(' ');
         const p3 = words.slice(i, i + 3).join(' ');
@@ -106,10 +114,13 @@ class StyleAnalyzer {
       }
     });
     const commonPhrases = Object.entries(phraseCounts)
-      .filter(p => p[1] >= 3).sort((a, b) => b[1] - a[1]).slice(0, 20).map(p => p[0]);
+      .filter(p => p[1] >= 3)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(p => p[0]);
 
     const punctuation = {
-      period:      Math.round(messages.filter(m => m.endsWith('.')).length / messages.length * 100),
+      period:      Math.round(messages.filter(m => m.endsWith('.')).length  / messages.length * 100),
       exclamation: Math.round(messages.filter(m => m.includes('!')).length  / messages.length * 100),
       question:    Math.round(messages.filter(m => m.includes('?')).length  / messages.length * 100),
       ellipsis:    Math.round(messages.filter(m => m.includes('...')).length / messages.length * 100)
@@ -121,27 +132,38 @@ class StyleAnalyzer {
     }).length;
     const capitalStyle = noCaps > messages.length * 0.5 ? 'minusculas_preferidas' : 'normal';
 
-    const fillerWords  = ['jaja','jeje','ajá','aja','ok','okay','sí','si','no','pues','entonces'];
+    const fillerWords  = ['jaja','jeje','ajá','aja','ok','okay','sí','si','no','pues','entonces','bueno','oye'];
     const fillerCounts = {};
     messages.forEach(msg => {
       const lower = msg.toLowerCase();
-      fillerWords.forEach(w => { if (lower.includes(w)) fillerCounts[w] = (fillerCounts[w] || 0) + 1; });
+      fillerWords.forEach(w => {
+        if (lower.includes(w)) fillerCounts[w] = (fillerCounts[w] || 0) + 1;
+      });
     });
-    const topFillers = Object.entries(fillerCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(f => f[0]);
+    const topFillers = Object.entries(fillerCounts)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5).map(f => f[0]);
 
-    const allWords     = messages.join(' ').split(/\s+/);
+    const allWords      = messages.join(' ').split(/\s+/);
     const avgWordLength = Math.round(allWords.reduce((s, w) => s + w.length, 0) / allWords.length);
 
-    const style = { avgMessageLength: avgLength, avgWordLength, emojis: topEmojis,
-      commonPhrases, punctuation, capitalStyle, fillerWords: topFillers, totalMessages: messages.length };
+    const style = {
+      avgMessageLength: avgLength,
+      avgWordLength,
+      emojis: topEmojis,
+      commonPhrases,
+      punctuation,
+      capitalStyle,
+      fillerWords: topFillers,
+      totalMessages: messages.length
+    };
 
     console.log('📊 ANÁLISIS COMPLETADO:\n');
-    console.log(`   📝 Total mensajes : ${style.totalMessages}`);
-    console.log(`   📏 Longitud prom  : ${style.avgMessageLength} caracteres`);
-    console.log(`   😊 Emojis top     : ${style.emojis.slice(0, 5).join(' ') || '(ninguno)'}`);
-    console.log(`   💬 Frases típicas : "${style.commonPhrases.slice(0, 3).join('", "') || '(ninguna)'}"`);
-    console.log(`   ❗ Puntuación     : ${style.punctuation.period}% punto, ${style.punctuation.exclamation}% exclamación`);
-    console.log(`   🔤 Capitalización : ${style.capitalStyle}\n`);
+    console.log(`   📝 Total mensajes  : ${style.totalMessages}`);
+    console.log(`   📏 Longitud prom   : ${style.avgMessageLength} caracteres`);
+    console.log(`   😊 Emojis top      : ${style.emojis.slice(0, 5).join(' ') || '(ninguno)'}`);
+    console.log(`   💬 Frases típicas  : "${style.commonPhrases.slice(0, 3).join('", "') || '(ninguna)'}"`);
+    console.log(`   ❗ Puntuación      : ${style.punctuation.period}% punto, ${style.punctuation.exclamation}% exclamación`);
+    console.log(`   🔤 Capitalización  : ${style.capitalStyle}\n`);
 
     return style;
   }
@@ -174,7 +196,7 @@ CARACTERÍSTICAS DEL ESTILO:
 - NO escribas mensajes muy largos ni muy cortos
 
 😊 EMOJIS (úsalos con frecuencia):
-${s.emojis.length ? s.emojis.map(e => `- ${e}`).join('\n') : '- No usa emojis'}
+${s.emojis.length ? s.emojis.map(e => `- ${e}`).join('\n') : '- No usa emojis frecuentemente'}
 
 💬 FRASES Y EXPRESIONES TÍPICAS:
 ${s.commonPhrases.slice(0, 10).map(p => `- "${p}"`).join('\n')}
