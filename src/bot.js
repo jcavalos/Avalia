@@ -80,7 +80,7 @@ class WhatsAppBot {
       if (msg.from.includes('@g.us')) return;
 
       // Solo mensajes de texto
-      if (msg.type !== 'chat') return;
+      if (!['chat', 'image', 'video', 'audio', 'ptt'].includes(msg.type) && !msg.body) return;
 
       // Filtrar por contactos permitidos si está configurado
       if (config.ALLOWED_CONTACTS.length > 0 && !config.ALLOWED_CONTACTS.includes(msg.from)) return;
