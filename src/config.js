@@ -4,7 +4,7 @@ const path = require('path');
 module.exports = {
   GROQ_API_KEY: process.env.GROQ_API_KEY,
   MODE: process.env.BOT_MODE || 'suggest',
-  MIN_REPLY_INTERVAL: parseInt(process.env.MIN_REPLY_INTERVAL) || 5,
+  MIN_REPLY_INTERVAL: parseInt(process.env.MIN_REPLY_INTERVAL) || 0,
 
   // Contactos a los que responde el bot (vacío = todos)
   ALLOWED_CONTACTS: process.env.ALLOWED_CONTACTS

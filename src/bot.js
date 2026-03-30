@@ -94,9 +94,12 @@ class WhatsAppBot {
       console.log(`📝 "${msg.body}"`);
 
       // ── MODO VIP: avisar pero NO responder automáticamente ──
-      const isVip = config.VIP_CONTACTS.some(v =>
-        msg.from.includes(v) || senderName.toLowerCase().includes(v.toLowerCase())
-      );
+      const isVip = config.VIP_CONTACTS.some(v => {
+  const vClean = v.trim().toLowerCase();
+  return msg.from.includes(vClean) || 
+         senderName.toLowerCase().includes(vClean) ||
+         senderName.toLowerCase() === vClean;
+        });
 
       if (isVip) {
         console.log('\n');
