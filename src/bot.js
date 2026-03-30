@@ -141,7 +141,8 @@ class WhatsAppBot {
       console.log(`\n💭 Respuesta: "${response}"\n`);
 
       if (config.MODE === 'auto') {
-        await msg.reply(response);
+        const chat = await msg.getChat();
+        await chat.sendMessage(response);
         console.log('✅ ENVIADA AUTOMÁTICAMENTE');
         this.lastReplyTime.set(msg.from, now);
       } else {
