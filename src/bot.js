@@ -79,7 +79,9 @@ class WhatsAppBot {
       // Ignorar grupos
       if (msg.from.includes('@g.us')) return;
       if (msg.from.includes('@broadcast')) return;
+      if (msg.from.includes('@newsletter')) return;
       if (msg.isStatus) return;
+      if (msg.type === 'status') return;
       // Solo mensajes de texto
       if (!['chat', 'image', 'video', 'audio', 'ptt'].includes(msg.type) && !msg.body) return;
 
@@ -114,16 +116,24 @@ class WhatsAppBot {
       }
 
       // ── Intervalo mínimo por contacto ──
-      const lastReply   = this.lastReplyTime.get(msg.from) || 0;
-      const now         = Date.now();
-      const minInterval = config.MIN_REPLY_INTERVAL * 60 * 1000;
+    const lastReply   = this.lastReplyTime.get(msg.from) || 0;
+const now         = Date.now();
+const minInterval = config.MIN_REPLY_INTERVAL * 60 * 1000;
 
-      if (minInterval > 0 && (now - lastReply) < minInterval) {
-        const wait = Math.ceil((minInterval - (now - lastReply)) / 60000);
-        console.log(`⏳ Esperando ${wait} min antes de volver a responder a ${senderName}`);
-        console.log('-'.repeat(50));
-        return;
-      }
+if (minInterval > 0 && (now - lastReply) < minInterval) {
+  const wait = (minInterval - (now - lastReply));
+  console.log(`⏳ Esperando ${Math.ceil(wait/60000)} min para responder a ${senderName}`);
+  setTimeout(async () => {
+    const response = await this.gemini.generateResponse(msg.body, msg.from, this.systemPrompt);
+    if (response) {
+      const chat = await msg.getChat();
+      await chat.sendMessage(response);
+      console.log(`✅ Respuesta retrasada enviada a ${senderName}: "${response}"`);
+      this.lastReplyTime.set(msg.from, Date.now());
+    }
+  }, wait);
+  return;
+}
 
       // ── Generar respuesta ──
       console.log('🤖 Generando respuesta con Gemini...');
