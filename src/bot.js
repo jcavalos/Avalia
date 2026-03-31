@@ -78,7 +78,8 @@ class WhatsAppBot {
 
       // Ignorar grupos
       if (msg.from.includes('@g.us')) return;
-
+      if (msg.from.includes('@broadcast')) return;
+      if (msg.isStatus) return;
       // Solo mensajes de texto
       if (!['chat', 'image', 'video', 'audio', 'ptt'].includes(msg.type) && !msg.body) return;
 
