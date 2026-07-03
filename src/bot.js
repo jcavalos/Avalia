@@ -1,14 +1,17 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode        = require('qrcode-terminal');
-const path          = require('path');
-const StyleAnalyzer = require('./analyzer');
-const GeminiClient  = require('./claude');
-const config        = require('./config');
+const qrcode          = require('qrcode-terminal');
+const path            = require('path');
+const StyleAnalyzer   = require('./analyzer');
+const GeminiClient    = require('./claude');
+const KnowledgeLoader = require('./knowledgeLoader'); // NUEVO
+const config          = require('./config');
 
 class WhatsAppBot {
   constructor() {
     this.analyzer      = new StyleAnalyzer();
     this.gemini        = new GeminiClient();
+    this.knowledge     = new KnowledgeLoader(); // NUEVO
+    this.hasKnowledge  = false;                 // NUEVO
     this.lastReplyTime = new Map();
     this.systemPrompt  = null;
 
@@ -51,6 +54,7 @@ class WhatsAppBot {
       console.log(`⚙️  Modo: ${config.MODE === 'auto' ? '🤖 AUTOMÁTICO' : '💡 SUGERENCIAS'}`);
       console.log(`⏱️  Intervalo mínimo: ${config.MIN_REPLY_INTERVAL} min`);
       console.log(`👥 Contactos: ${config.ALLOWED_CONTACTS.length ? config.ALLOWED_CONTACTS.join(', ') : 'TODOS'}`);
+      console.log(`📚 Conocimiento de documentos: ${this.hasKnowledge ? 'ACTIVO' : 'sin documentos cargados'}`);
       if (config.VIP_CONTACTS.length > 0) {
         console.log(`⭐ Contactos VIP (solo aviso): ${config.VIP_CONTACTS.join(', ')}`);
       }
@@ -69,6 +73,27 @@ class WhatsAppBot {
     this.client.on('message', async (msg) => {
       await this.handleMessage(msg);
     });
+  }
+
+  // NUEVO: combina el prompt de personalidad (fijo) con el conocimiento
+  // relevante a ESTE mensaje específico (cambia con cada pregunta).
+  _buildPrompt(userMessage) {
+    if (!this.hasKnowledge) return this.systemPrompt;
+
+    const contextBlock = this.knowledge.generateContextBlock(userMessage);
+
+    return `${this.systemPrompt}
+
+## CONOCIMIENTO DE TUS DOCUMENTOS (libros, trabajo, notas)
+Si esta sección tiene información relevante a lo que preguntan, úsala para
+responder — pero sigue hablando con tu estilo natural, no la resumas como
+si fuera un documento.
+
+Si dice "NO SE ENCONTRÓ INFORMACIÓN RELACIONADA": tus documentos no cubren
+este tema. NO inventes datos de trabajo o del libro en ese caso — responde
+con lo que sabes de forma natural, o di que no tienes ese dato a la mano.
+
+${contextBlock}`;
   }
 
   async handleMessage(msg) {
@@ -98,11 +123,11 @@ class WhatsAppBot {
 
       // ── MODO VIP: avisar pero NO responder automáticamente ──
       const isVip = config.VIP_CONTACTS.some(v => {
-  const vClean = v.trim().toLowerCase();
-  return msg.from.includes(vClean) || 
-         senderName.toLowerCase().includes(vClean) ||
-         senderName.toLowerCase() === vClean;
-        });
+        const vClean = v.trim().toLowerCase();
+        return msg.from.includes(vClean) ||
+               senderName.toLowerCase().includes(vClean) ||
+               senderName.toLowerCase() === vClean;
+      });
 
       if (isVip) {
         console.log('\n');
@@ -116,31 +141,33 @@ class WhatsAppBot {
       }
 
       // ── Intervalo mínimo por contacto ──
-    const lastReply   = this.lastReplyTime.get(msg.from) || 0;
-const now         = Date.now();
-const minInterval = config.MIN_REPLY_INTERVAL * 60 * 1000;
+      const lastReply   = this.lastReplyTime.get(msg.from) || 0;
+      const now         = Date.now();
+      const minInterval = config.MIN_REPLY_INTERVAL * 60 * 1000;
 
-if (minInterval > 0 && (now - lastReply) < minInterval) {
-  const wait = (minInterval - (now - lastReply));
-  console.log(`⏳ Esperando ${Math.ceil(wait/60000)} min para responder a ${senderName}`);
-  setTimeout(async () => {
-    const response = await this.gemini.generateResponse(msg.body, msg.from, this.systemPrompt);
-    if (response) {
-      const chat = await msg.getChat();
-      await chat.sendMessage(response);
-      console.log(`✅ Respuesta retrasada enviada a ${senderName}: "${response}"`);
-      this.lastReplyTime.set(msg.from, Date.now());
-    }
-  }, wait);
-  return;
-}
+      if (minInterval > 0 && (now - lastReply) < minInterval) {
+        const wait = (minInterval - (now - lastReply));
+        console.log(`⏳ Esperando ${Math.ceil(wait/60000)} min para responder a ${senderName}`);
+        setTimeout(async () => {
+          const promptFinal = this._buildPrompt(msg.body); // NUEVO
+          const response = await this.gemini.generateResponse(msg.body, msg.from, promptFinal);
+          if (response) {
+            const chat = await msg.getChat();
+            await chat.sendMessage(response);
+            console.log(`✅ Respuesta retrasada enviada a ${senderName}: "${response}"`);
+            this.lastReplyTime.set(msg.from, Date.now());
+          }
+        }, wait);
+        return;
+      }
 
       // ── Generar respuesta ──
-      console.log('🤖 Generando respuesta con Gemini...');
+      console.log('🤖 Generando respuesta...');
+      const promptFinal = this._buildPrompt(msg.body); // NUEVO: prompt + conocimiento relevante
       const response = await this.gemini.generateResponse(
         msg.body,
         msg.from,
-        this.systemPrompt
+        promptFinal
       );
 
       if (!response) {
@@ -175,10 +202,10 @@ if (minInterval > 0 && (now - lastReply) < minInterval) {
     console.log('='.repeat(50) + '\n');
 
     if (!config.GROQ_API_KEY || config.GROQ_API_KEY.includes('tu-key')) {
-      console.error('❌ Falta GEMINI_API_KEY en tu archivo .env\n');
-      console.log('   1. Ve a https://aistudio.google.com/app/apikey');
+      console.error('❌ Falta GROQ_API_KEY en tu archivo .env\n');
+      console.log('   1. Ve a https://console.groq.com/keys');
       console.log('   2. Crea una API key gratis');
-      console.log('   3. Pégala en .env como GEMINI_API_KEY=AIzaSy...\n');
+      console.log('   3. Pégala en .env como GROQ_API_KEY=gsk_...\n');
       process.exit(1);
     }
 
@@ -194,6 +221,19 @@ if (minInterval > 0 && (now - lastReply) < minInterval) {
     }
 
     this.systemPrompt = this.analyzer.generateSystemPrompt();
+
+    // NUEVO: carga documentos si existen. Si no hay carpeta docs/ o está
+    // vacía, el bot sigue funcionando normal, solo sin ese conocimiento extra.
+    try {
+      console.log('📚 Buscando documentos (PDFs)...');
+      await this.knowledge.loadDocuments();
+      this.hasKnowledge = true;
+    } catch (error) {
+      console.log(`ℹ️  Sin documentos cargados (${error.message.split('\n')[0]})`);
+      console.log('   El bot seguirá funcionando solo con tu estilo de chats.\n');
+      this.hasKnowledge = false;
+    }
+
     console.log('🔄 Conectando a WhatsApp...\n');
     await this.client.initialize();
   }

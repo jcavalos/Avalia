@@ -19,6 +19,10 @@ module.exports = {
   PATHS: {
     CHATS:         path.join(__dirname, '../exported_chats'),
     STYLE:         path.join(__dirname, '../data/style.json'),
-    CONVERSATIONS: path.join(__dirname, '../data/conversations.json')
+    CONVERSATIONS: path.join(__dirname, '../data/conversations.json'),
+
+    // NUEVO: para el conocimiento de documentos (libros, PDFs de trabajo, etc.)
+    DOCS:  path.join(__dirname, '../docs'),        // aquí pones tus .pdf
+    CACHE: path.join(__dirname, '../data/docs_cache') // aquí se cachea el texto extraído
   }
 };
